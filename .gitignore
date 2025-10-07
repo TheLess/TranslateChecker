@@ -119,7 +119,7 @@ logs/
 
 # Model cache
 .cache/
-models/
+# models/
 sentence-transformers/
 
 # IDE
