@@ -1,0 +1,80 @@
+# 关键词和术语字典
+# 用于检查翻译中关键词的一致性和规范性
+
+# 专业术语映射
+terminology:
+  # 技术术语
+  "人工智能": ["artificial intelligence", "AI"]
+  "机器学习": ["machine learning", "ML"]
+  "深度学习": ["deep learning", "DL"]
+  "神经网络": ["neural network", "NN"]
+  "自然语言处理": ["natural language processing", "NLP"]
+  
+  # 商业术语
+  "用户体验": ["user experience", "UX"]
+  "用户界面": ["user interface", "UI"]
+  "投资回报率": ["return on investment", "ROI"]
+  "关键绩效指标": ["key performance indicator", "KPI"]
+  
+  # 常见概念
+  "数据库": ["database", "DB"]
+  "应用程序": ["application", "app"]
+  "操作系统": ["operating system", "OS"]
+  "软件开发": ["software development"]
+
+# 品牌名称 (必须保持一致)
+brands:
+  - "Microsoft"
+  - "Google"
+  - "Apple"
+  - "Amazon"
+  - "Facebook"
+  - "OpenAI"
+  - "GitHub"
+
+# 禁用词汇 (不应出现在翻译中)
+forbidden_words:
+  - "机翻"
+  - "谷歌翻译"
+  - "百度翻译"
+  - "[翻译]"
+  - "[译]"
+
+# 格式规范
+format_rules:
+  # 数字格式
+  numbers:
+    # 是否保持原文数字格式
+    preserve_format: true
+    # 千位分隔符规范
+    thousand_separator: ","
+  
+  # 标点符号
+  punctuation:
+    # 英文标点规范
+    use_english_punctuation: true
+    # 引号规范
+    quote_style: "double"  # single, double
+  
+  # 大小写规范
+  capitalization:
+    # 专有名词首字母大写
+    proper_nouns: true
+    # 句首大写
+    sentence_start: true
+
+# 上下文相关规则
+context_rules:
+  # 技术文档
+  technical:
+    # 保持技术术语英文原文
+    keep_original_terms: true
+    # 添加中文解释
+    add_chinese_explanation: false
+  
+  # 营销文案
+  marketing:
+    # 使用本土化表达
+    localize_expressions: true
+    # 保持品牌调性
+    maintain_brand_tone: true

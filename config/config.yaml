@@ -1,0 +1,86 @@
+# Translation Checker 配置文件
+
+# 数据处理配置
+data:
+  # 支持的文件格式
+  supported_formats: ['.xlsx', '.xls', '.csv']
+  # 默认编码
+  encoding: 'utf-8'
+  # Excel列名映射
+  column_mapping:
+    source: ['中文', 'chinese', 'source', '源文本']
+    target: ['英文', 'english', 'target', '翻译', '译文']
+
+# 检测层配置
+detection:
+  # 基础规则检测
+  rules:
+    # 长度比例检查 (目标文本长度/源文本长度的合理范围)
+    length_ratio_min: 0.3
+    length_ratio_max: 3.0
+    # 空值检查
+    check_empty: true
+    # 特殊字符检查
+    check_special_chars: true
+    
+  # 语义相似度检测
+  similarity:
+    # 使用的模型
+    model_name: 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
+    # 相似度阈值 (低于此值认为翻译可能有问题)
+    threshold: 0.7
+    # 批处理大小
+    batch_size: 32
+    
+  # 关键词规范性检测
+  keywords:
+    # 关键词字典文件路径
+    dictionary_path: 'config/keywords.yaml'
+    # 是否区分大小写
+    case_sensitive: false
+    # 是否检查专业术语一致性
+    check_terminology: true
+
+# LLM配置
+llm:
+  # 使用的LLM提供商 (openai, local, azure)
+  provider: 'openai'
+  # OpenAI配置
+  openai:
+    model: 'gpt-3.5-turbo'
+    api_key: ''  # 请在环境变量中设置 OPENAI_API_KEY
+    max_tokens: 1000
+    temperature: 0.1
+  # 本地模型配置
+  local:
+    model_path: ''
+    device: 'auto'  # auto, cpu, cuda
+  # 评估提示词模板
+  prompt_template: |
+    请评估以下中英文翻译的质量，从以下几个方面分析：
+    1. 准确性：翻译是否准确传达了原文意思
+    2. 流畅性：译文是否自然流畅
+    3. 一致性：专业术语和关键词是否一致
+    4. 完整性：是否有遗漏或添加内容
+    
+    原文：{source}
+    译文：{target}
+    
+    请给出1-10分的评分，并简要说明问题（如果有的话）。
+
+# 输出配置
+output:
+  # 报告格式 (excel, json, html)
+  format: 'excel'
+  # 输出目录
+  output_dir: 'output'
+  # 是否包含详细分析
+  include_details: true
+  # 是否生成可视化图表
+  generate_charts: true
+
+# 日志配置
+logging:
+  level: 'INFO'  # DEBUG, INFO, WARNING, ERROR
+  file: 'logs/translation_checker.log'
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
