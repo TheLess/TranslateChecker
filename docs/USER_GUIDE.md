@@ -86,6 +86,15 @@ python main.py status --config my_config.yaml
 Translation Checker 支持以下Excel文件结构：
 
 ```
+| ID | 中文 | 英文 |
+|----|------|------|
+| 1  | 原文1 | 译文1 |
+| 2  | 原文2 | 译文2 |
+```
+
+或者不包含ID列的简单结构：
+
+```
 | 中文 | 英文 |
 |------|------|
 | 原文1 | 译文1 |
@@ -93,6 +102,9 @@ Translation Checker 支持以下Excel文件结构：
 ```
 
 ### 支持的列名
+
+**ID列** (可选):
+- `ID`, `id`, `Index`, `index`, `序号`, `编号`
 
 **源语言列** (中文):
 - `中文`, `Chinese`, `Source`, `源文本`

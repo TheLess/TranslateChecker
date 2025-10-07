@@ -6,10 +6,11 @@ data:
   supported_formats: ['.xlsx', '.xls', '.csv']
   # 默认编码
   encoding: 'utf-8'
-  # Excel列名映射
+  # Excel列名映射 - 可以根据你的文件格式自定义
   column_mapping:
-    source: ['中文', 'chinese', 'source', '源文本']
-    target: ['英文', 'english', 'target', '翻译', '译文']
+    id: ['ID', 'id', 'Index', 'index', '序号', '编号', '条目ID']  # 添加你的ID列名
+    source: ['简体', '中文', 'source', '源文本', '原文']      # 添加你的源语言列名
+    target: ['英语', 'EN', 'target', '翻译', '译文', '目标文本']  # 添加你的目标语言列名
 
 # 检测层配置
 detection:
@@ -25,11 +26,11 @@ detection:
     
   # 语义相似度检测
   similarity:
-    # 使用的模型
+    # 使用的模型 - 可选择不同的模型以平衡速度和精度
     model_name: 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
-    # 相似度阈值 (低于此值认为翻译可能有问题)
+    # 相似度阈值 (低于此值认为翻译可能有问题) - 可根据需要调整 0.6-0.8
     threshold: 0.7
-    # 批处理大小
+    # 批处理大小 - 根据内存情况调整，内存不足可改为16或8
     batch_size: 32
     
   # 关键词规范性检测

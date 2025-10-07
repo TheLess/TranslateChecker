@@ -115,7 +115,7 @@ OPENAI_API_KEY=your_api_key_here
 
 ### ✅ 已实现功能
 
-- **📊 Excel文件处理**: 支持 .xlsx, .xls, .csv 格式
+- **📊 Excel文件处理**: 支持 .xlsx, .xls, .csv 格式，自动识别ID列
 - **🔍 基础规则检测**: 长度比例、空值、特殊字符、术语一致性
 - **🧠 语义相似度分析**: 使用多语言sentence-transformers模型
 - **🤖 LLM质量评估**: 支持OpenAI GPT进行深度分析

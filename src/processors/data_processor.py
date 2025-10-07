@@ -71,19 +71,26 @@ class DataProcessor:
             
     def identify_columns(self, df: pd.DataFrame) -> Dict[str, str]:
         """
-        自动识别源语言和目标语言列
+        自动识别ID列、源语言和目标语言列
         
         Args:
             df: 数据框
             
         Returns:
-            包含源语言和目标语言列名的字典
+            包含ID、源语言和目标语言列名的字典
             
         Raises:
             ValueError: 无法识别必要的列
         """
         columns = df.columns.tolist()
         result = {}
+        
+        # 识别ID列
+        id_candidates = self.column_mapping.get('id', [])
+        for col in columns:
+            if any(candidate.lower() in col.lower() for candidate in id_candidates):
+                result['id'] = col
+                break
         
         # 识别源语言列（中文）
         source_candidates = self.column_mapping.get('source', [])
@@ -98,23 +105,45 @@ class DataProcessor:
             if any(candidate.lower() in col.lower() for candidate in target_candidates):
                 result['target'] = col
                 break
-                
-        # 如果自动识别失败，尝试使用前两列
+        
+        # 如果没有找到ID列，检查是否有数字类型的列作为ID
+        if 'id' not in result:
+            for col in columns:
+                if df[col].dtype in ['int64', 'int32', 'float64'] and col not in [result.get('source'), result.get('target')]:
+                    # 检查是否是连续的数字序列
+                    if df[col].is_monotonic_increasing:
+                        result['id'] = col
+                        self.logger.info(f"自动识别数字序列列作为ID: {col}")
+                        break
+        
+        # 如果自动识别失败，根据列数量进行推断
+        available_columns = [col for col in columns if col not in result.values()]
+        
         if 'source' not in result:
-            if len(columns) >= 2:
-                result['source'] = columns[0]
-                self.logger.warning(f"无法自动识别源语言列，使用第一列: {columns[0]}")
+            if len(available_columns) >= 2:
+                # 如果有ID列，源语言列通常是第二列，否则是第一列
+                idx = 1 if 'id' in result else 0
+                if idx < len(available_columns):
+                    result['source'] = available_columns[idx]
+                    self.logger.warning(f"无法自动识别源语言列，使用: {available_columns[idx]}")
             else:
                 raise ValueError("无法识别源语言列")
                 
         if 'target' not in result:
-            if len(columns) >= 2:
-                result['target'] = columns[1]
-                self.logger.warning(f"无法自动识别目标语言列，使用第二列: {columns[1]}")
+            available_columns = [col for col in columns if col not in result.values()]
+            if len(available_columns) >= 1:
+                result['target'] = available_columns[0]
+                self.logger.warning(f"无法自动识别目标语言列，使用: {available_columns[0]}")
             else:
                 raise ValueError("无法识别目标语言列")
-                
-        self.logger.info(f"识别到列映射: 源语言='{result['source']}', 目标语言='{result['target']}'")
+        
+        # 记录识别结果
+        log_msg = f"识别到列映射: "
+        if 'id' in result:
+            log_msg += f"ID='{result['id']}', "
+        log_msg += f"源语言='{result['source']}', 目标语言='{result['target']}'"
+        self.logger.info(log_msg)
+        
         return result
         
     def clean_text(self, text: str) -> str:
@@ -143,7 +172,7 @@ class DataProcessor:
         
         return text
         
-    def preprocess_data(self, df: pd.DataFrame, source_col: str, target_col: str) -> pd.DataFrame:
+    def preprocess_data(self, df: pd.DataFrame, source_col: str, target_col: str, id_col: Optional[str] = None) -> pd.DataFrame:
         """
         预处理数据
         
@@ -151,6 +180,7 @@ class DataProcessor:
             df: 原始数据框
             source_col: 源语言列名
             target_col: 目标语言列名
+            id_col: ID列名（可选）
             
         Returns:
             预处理后的数据框
@@ -159,6 +189,16 @@ class DataProcessor:
         
         # 创建副本避免修改原数据
         processed_df = df.copy()
+        
+        # 如果有ID列，保留它并确保数据类型正确
+        if id_col and id_col in processed_df.columns:
+            # 保留原始ID
+            processed_df['translation_id'] = processed_df[id_col]
+            self.logger.info(f"保留ID列: {id_col}")
+        else:
+            # 如果没有ID列，创建一个基于索引的ID
+            processed_df['translation_id'] = processed_df.index + 1
+            self.logger.info("创建基于索引的ID列")
         
         # 添加行索引（用于追踪原始位置）
         processed_df['original_index'] = processed_df.index
@@ -250,7 +290,8 @@ class DataProcessor:
         processed_df = self.preprocess_data(
             df, 
             column_mapping['source'], 
-            column_mapping['target']
+            column_mapping['target'],
+            column_mapping.get('id')  # 传递ID列信息
         )
         
         # 获取统计信息

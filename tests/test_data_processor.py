@@ -35,8 +35,9 @@ class TestDataProcessor:
         
     def test_identify_columns(self):
         """测试列识别功能"""
-        # 创建测试数据框
+        # 创建测试数据框（包含ID列）
         df = pd.DataFrame({
+            'ID': [1, 2],
             '中文': ['你好', '世界'],
             '英文': ['hello', 'world'],
             '其他': ['other', 'data']
@@ -44,6 +45,7 @@ class TestDataProcessor:
         
         columns = self.processor.identify_columns(df)
         
+        assert columns['id'] == 'ID'
         assert columns['source'] == '中文'
         assert columns['target'] == '英文'
         
@@ -69,6 +71,7 @@ class TestDataProcessor:
     def create_test_excel_file(self):
         """创建测试Excel文件"""
         data = {
+            'ID': [1, 2, 3],
             '中文': ['人工智能', '机器学习', '深度学习'],
             '英文': ['Artificial Intelligence', 'Machine Learning', 'Deep Learning']
         }
@@ -88,6 +91,7 @@ class TestDataProcessor:
             df = self.processor.load_excel_file(test_file)
             
             assert len(df) == 3
+            assert 'ID' in df.columns
             assert '中文' in df.columns
             assert '英文' in df.columns
             
@@ -105,9 +109,11 @@ class TestDataProcessor:
             
             # 检查结果
             assert len(df) == 3
+            assert column_mapping['id'] == 'ID'
             assert column_mapping['source'] == '中文'
             assert column_mapping['target'] == '英文'
             assert 'original_index' in df.columns
+            assert 'translation_id' in df.columns
             
         finally:
             # 清理临时文件
