@@ -35,8 +35,13 @@ class SimilarityModel:
             'model_name', 
             'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
         )
+        self.backup_models = self.similarity_config.get('backup_models', [
+            'sentence-transformers/paraphrase-multilingual-mpnet-base-v2',
+            'sentence-transformers/all-MiniLM-L6-v2'
+        ])
         self.threshold = self.similarity_config.get('threshold', 0.7)
         self.batch_size = self.similarity_config.get('batch_size', 32)
+        self.device_config = self.similarity_config.get('device', 'auto')
         
         # 初始化模型
         self.model = None
@@ -49,12 +54,16 @@ class SimilarityModel:
             self.logger.info(f"正在加载模型: {self.model_name}")
             
             # 检测设备
-            if torch.cuda.is_available():
-                self.device = 'cuda'
-                self.logger.info("使用GPU加速")
+            if self.device_config == 'auto':
+                if torch.cuda.is_available():
+                    self.device = 'cuda'
+                    self.logger.info("使用GPU加速")
+                else:
+                    self.device = 'cpu'
+                    self.logger.info("使用CPU")
             else:
-                self.device = 'cpu'
-                self.logger.info("使用CPU")
+                self.device = self.device_config
+                self.logger.info(f"使用指定设备: {self.device}")
                 
             # 加载模型
             self.model = SentenceTransformer(self.model_name, device=self.device)
@@ -62,14 +71,21 @@ class SimilarityModel:
             
         except Exception as e:
             self.logger.error(f"模型加载失败: {e}")
-            self.logger.warning("将使用备用模型")
-            try:
-                # 尝试使用更小的备用模型
-                backup_model = 'sentence-transformers/paraphrase-multilingual-mpnet-base-v2'
-                self.model = SentenceTransformer(backup_model, device=self.device)
-                self.logger.info(f"备用模型加载成功: {backup_model}")
-            except Exception as e2:
-                self.logger.error(f"备用模型也加载失败: {e2}")
+            self.logger.warning("将尝试备用模型")
+            
+            # 尝试备用模型列表
+            for backup_model in self.backup_models:
+                try:
+                    self.logger.info(f"尝试加载备用模型: {backup_model}")
+                    self.model = SentenceTransformer(backup_model, device=self.device)
+                    self.logger.info(f"备用模型加载成功: {backup_model}")
+                    self.model_name = backup_model  # 更新当前使用的模型名
+                    break
+                except Exception as e2:
+                    self.logger.warning(f"备用模型 {backup_model} 加载失败: {e2}")
+                    continue
+            else:
+                self.logger.error("所有备用模型都加载失败")
                 raise RuntimeError("无法加载任何相似度模型")
                 
     def encode_texts(self, texts: List[str], show_progress: bool = True) -> np.ndarray:

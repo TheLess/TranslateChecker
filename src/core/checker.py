@@ -164,8 +164,13 @@ class TranslationChecker:
         Returns:
             包含综合评分的数据框
         """
+        # 获取评分配置
+        scoring_config = self.config.get('scoring', {})
+        weights = scoring_config.get('weights', {})
+        defaults = scoring_config.get('defaults', {})
+        
         # 初始化综合评分
-        df['overall_score'] = 0.0
+        df['overall_score'] = defaults.get('score', 0.0)
         df['overall_status'] = 'unknown'
         df['overall_issues'] = ''
         
@@ -173,32 +178,35 @@ class TranslationChecker:
             score_components = []
             issues = []
             
-            # 规则检测分数 (权重: 30%)
+            # 规则检测分数
+            rule_weight = weights.get('rules', 0.3)
             if row.get('rule_check_passed', False):
                 rule_score = 10
             else:
                 rule_score = 0
                 if row.get('rule_check_issues'):
                     issues.append(f"规则问题: {row['rule_check_issues']}")
-            score_components.append(('rules', rule_score, 0.3))
+            score_components.append(('rules', rule_score, rule_weight))
             
-            # 相似度分数 (权重: 40%)
+            # 相似度分数
+            similarity_weight = weights.get('similarity', 0.4)
             if has_similarity and 'similarity_score' in df.columns:
                 similarity_score = row.get('similarity_score', 0) * 10  # 转换为10分制
                 if not row.get('similarity_passed', False):
                     issues.append(f"相似度问题: {row.get('similarity_message', '')}")
             else:
                 similarity_score = 5  # 默认中等分数
-            score_components.append(('similarity', similarity_score, 0.4))
+            score_components.append(('similarity', similarity_score, similarity_weight))
             
-            # LLM评估分数 (权重: 30%)
+            # LLM评估分数
+            llm_weight = weights.get('llm', 0.3)
             if has_llm and 'llm_score' in df.columns:
                 llm_score = row.get('llm_score', 0)
                 if llm_score < 7 and row.get('llm_issues'):
                     issues.append(f"LLM问题: {row['llm_issues']}")
             else:
                 llm_score = 5  # 默认中等分数
-            score_components.append(('llm', llm_score, 0.3))
+            score_components.append(('llm', llm_score, llm_weight))
             
             # 计算加权平均分
             total_score = sum(score * weight for _, score, weight in score_components)

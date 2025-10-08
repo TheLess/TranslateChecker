@@ -159,9 +159,10 @@ class RuleChecker:
             issues.append('存在异常的字符重复')
             
         # 检查是否包含过多的特殊符号
+        special_char_threshold = self.rules_config.get('special_char_threshold', 0.1)
         special_char_count = len(re.findall(r'[^\w\s\u4e00-\u9fff.,;:!?。，；：！？]', target))
-        if special_char_count > len(target) * 0.1:  # 超过10%的特殊字符
-            issues.append('包含过多特殊字符')
+        if special_char_count > len(target) * special_char_threshold:
+            issues.append(f'包含过多特殊字符 ({special_char_count}/{len(target)})')
             
         if issues:
             return {

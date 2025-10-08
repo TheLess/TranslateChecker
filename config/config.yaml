@@ -23,15 +23,23 @@ detection:
     check_empty: true
     # 特殊字符检查
     check_special_chars: true
+    # 特殊字符阈值 (超过此比例认为有问题)
+    special_char_threshold: 0.1
     
   # 语义相似度检测
   similarity:
     # 使用的模型 - 可选择不同的模型以平衡速度和精度
     model_name: 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
+    # 备用模型列表 - 按优先级排序
+    backup_models:
+      - 'sentence-transformers/paraphrase-multilingual-mpnet-base-v2'
+      - 'sentence-transformers/all-MiniLM-L6-v2'
     # 相似度阈值 (低于此值认为翻译可能有问题) - 可根据需要调整 0.6-0.8
     threshold: 0.7
     # 批处理大小 - 根据内存情况调整，内存不足可改为16或8
     batch_size: 32
+    # 设备选择 (auto, cpu, cuda)
+    device: 'auto'
     
   # 关键词规范性检测
   keywords:
@@ -41,6 +49,21 @@ detection:
     case_sensitive: false
     # 是否检查专业术语一致性
     check_terminology: true
+
+# 综合评分配置
+scoring:
+  # 各检查项目的权重 (总和应为1.0)
+  weights:
+    rules: 0.3        # 规则检测权重
+    similarity: 0.4   # 相似度检测权重  
+    llm: 0.3         # LLM评估权重
+  # 默认分数值
+  defaults:
+    score: 0.0
+    accuracy: 0.0
+    fluency: 0.0
+    consistency: 0.0
+    completeness: 0.0
 
 # LLM配置
 llm:
@@ -84,6 +107,19 @@ llm:
     secret_key: ''  # 请在环境变量中设置 WENXIN_SECRET_KEY
     max_tokens: 1000
     temperature: 0.1
+    
+  # API调用配置
+  api:
+    # 请求间隔时间（秒）- 避免API限制
+    request_delay: 0.1
+    # 重试配置
+    max_retries: 3
+    # 重试延迟策略 (fixed, exponential)
+    retry_strategy: 'exponential'
+    # 基础重试延迟（秒）
+    base_retry_delay: 1
+    # 请求超时时间（秒）
+    timeout: 30
   # 评估提示词模板
   prompt_template: |
     评估翻译质量并返回JSON格式结果。

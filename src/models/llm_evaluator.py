@@ -30,15 +30,25 @@ class LLMEvaluator:
         
         # 获取LLM配置
         self.llm_config = self.config.get('llm', {})
-        self.provider = self.llm_config.get('provider', 'openai')
+        self.provider = self.llm_config.get('provider', 'ollama')
         
-        # 初始化客户端
-        self._init_client()
+        # 获取API配置
+        self.api_config = self.llm_config.get('api', {})
+        self.request_delay = self.api_config.get('request_delay', 0.1)
+        self.max_retries = self.api_config.get('max_retries', 3)
+        self.retry_strategy = self.api_config.get('retry_strategy', 'exponential')
+        self.base_retry_delay = self.api_config.get('base_retry_delay', 1)
+        self.timeout = self.api_config.get('timeout', 30)
         
         # 获取提示词模板
         self.prompt_template = self.llm_config.get('prompt_template', self._get_default_prompt())
         
+        # 初始化客户端
+        self.client = None
+        self._init_client()
+        
     def _init_client(self):
+        
         """初始化LLM客户端"""
         if self.provider == 'openai':
             self._init_openai_client()
@@ -232,7 +242,7 @@ class LLMEvaluator:
     "explanation": "详细说明"
 }}"""
 
-    def _call_llm(self, prompt: str, max_retries: int = 3) -> Optional[str]:
+    def _call_llm(self, prompt: str, max_retries: int = None) -> Optional[str]:
         """
         调用LLM API
         
@@ -245,6 +255,10 @@ class LLMEvaluator:
         """
         if self.client is None:
             return None
+        
+        # 使用配置的重试次数
+        if max_retries is None:
+            max_retries = self.max_retries
             
         for attempt in range(max_retries):
             try:
@@ -275,7 +289,12 @@ class LLMEvaluator:
             except Exception as e:
                 self.logger.warning(f"LLM调用失败 (尝试 {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
-                    time.sleep(2 ** attempt)  # 指数退避
+                    # 使用配置的重试策略
+                    if self.retry_strategy == 'exponential':
+                        delay = self.base_retry_delay * (2 ** attempt)
+                    else:  # fixed
+                        delay = self.base_retry_delay
+                    time.sleep(delay)
                     
         return None
         
@@ -529,20 +548,24 @@ class LLMEvaluator:
             result = self.evaluate_single_pair(source, target)
             results.append(result)
             
-            # 添加延迟以避免API限制（减少延迟提升性能）
-            time.sleep(0.1)
+            # 添加延迟以避免API限制（使用配置的延迟时间）
+            time.sleep(self.request_delay)
         
         self.logger.info(f"✓ LLM评估完成，共处理 {len(results)} 条数据")
             
         # 将结果添加到数据框
         result_df = df.copy()
         
-        # 初始化LLM评估列 - 使用正确的数据类型
-        result_df['llm_score'] = 0.0  # float类型
-        result_df['llm_accuracy'] = 0.0
-        result_df['llm_fluency'] = 0.0
-        result_df['llm_consistency'] = 0.0
-        result_df['llm_completeness'] = 0.0
+        # 获取默认分数配置
+        scoring_config = self.config.get('scoring', {})
+        defaults = scoring_config.get('defaults', {})
+        
+        # 初始化LLM评估列 - 使用配置的默认值
+        result_df['llm_score'] = defaults.get('score', 0.0)
+        result_df['llm_accuracy'] = defaults.get('accuracy', 0.0)
+        result_df['llm_fluency'] = defaults.get('fluency', 0.0)
+        result_df['llm_consistency'] = defaults.get('consistency', 0.0)
+        result_df['llm_completeness'] = defaults.get('completeness', 0.0)
         result_df['llm_issues'] = ""  # string类型
         result_df['llm_suggestions'] = ""
         result_df['llm_explanation'] = ""
