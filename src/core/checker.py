@@ -395,15 +395,48 @@ class TranslationChecker:
         status = {
             'data_processor': 'ready',
             'rule_checker': 'ready',
-            'similarity_model': 'not_loaded',
-            'llm_evaluator': 'not_loaded'
+            'similarity_model': 'lazy_load',  # 延迟加载
+            'llm_evaluator': 'lazy_load'      # 延迟加载
         }
         
+        # 检查相似度模型状态
         if self.similarity_model:
             model_info = self.similarity_model.get_model_info()
-            status['similarity_model'] = model_info.get('status', 'unknown')
+            status['similarity_model'] = model_info.get('status', 'loaded')
+        else:
+            # 尝试检测是否可以加载
+            try:
+                import sentence_transformers
+                status['similarity_model'] = 'ready'
+            except ImportError:
+                status['similarity_model'] = 'missing_deps'
             
+        # 检查LLM评估器状态  
         if self.llm_evaluator:
             status['llm_evaluator'] = 'ready' if self.llm_evaluator.client else 'no_api_key'
+        else:
+            # 根据配置检查LLM状态
+            llm_config = self.config.get('llm', {})
+            provider = llm_config.get('provider', 'openai')
+            
+            if provider == 'ollama':
+                try:
+                    import requests
+                    base_url = llm_config.get('ollama', {}).get('base_url', 'http://localhost:11434')
+                    response = requests.get(f"{base_url}/api/tags", timeout=2)
+                    if response.status_code == 200:
+                        status['llm_evaluator'] = 'ollama_ready'
+                    else:
+                        status['llm_evaluator'] = 'ollama_offline'
+                except:
+                    status['llm_evaluator'] = 'ollama_offline'
+            elif provider in ['qwen', 'glm', 'wenxin']:
+                status['llm_evaluator'] = 'api_ready'
+            elif provider == 'openai':
+                import os
+                if os.getenv('OPENAI_API_KEY') or llm_config.get('openai', {}).get('api_key'):
+                    status['llm_evaluator'] = 'api_ready'
+                else:
+                    status['llm_evaluator'] = 'no_api_key'
             
         return status

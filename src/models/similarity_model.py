@@ -13,6 +13,8 @@ from tqdm import tqdm
 from ..utils.config_loader import ConfigLoader
 from ..utils.logger import get_logger
 
+# 不强行修改sentence_transformers的内部实现
+
 
 class SimilarityModel:
     """语义相似度模型"""
@@ -175,14 +177,13 @@ class SimilarityModel:
                 message = f'语义相似度正常 ({similarity:.3f})'
                 issue = None
             else:
-                message = f'语义相似度过低 ({similarity:.3f} < {self.threshold})'
                 issue = 'low_similarity'
                 
             return {
                 'passed': passed,
                 'similarity': float(similarity),
                 'issue': issue,
-                'message': message
+                'message': f'相似度过低: {similarity:.3f} < {self.threshold}'
             }
             
         except Exception as e:
@@ -206,7 +207,7 @@ class SimilarityModel:
         Returns:
             包含相似度检查结果的数据框
         """
-        self.logger.info(f"开始语义相似度检查，共 {len(df)} 条数据")
+        self.logger.info(f"🔄 开始语义相似度检查，共 {len(df)} 条数据")
         
         # 准备文本数据
         source_texts = df[source_col].fillna('').astype(str).tolist()
@@ -214,15 +215,18 @@ class SimilarityModel:
         
         try:
             # 批量编码
-            self.logger.info("正在编码源文本...")
-            source_embeddings = self.encode_texts(source_texts)
+            self.logger.info("🔄 正在编码源文本...")
+            source_embeddings = self.encode_texts(source_texts, show_progress=True)
+            self.logger.info("✓ 源文本编码完成")
             
-            self.logger.info("正在编码目标文本...")
-            target_embeddings = self.encode_texts(target_texts)
+            self.logger.info("🔄 正在编码目标文本...")
+            target_embeddings = self.encode_texts(target_texts, show_progress=True)
+            self.logger.info("✓ 目标文本编码完成")
             
             # 计算相似度
-            self.logger.info("正在计算相似度...")
+            self.logger.info("🔄 正在计算相似度...")
             similarities = self.calculate_similarity(source_embeddings, target_embeddings)
+            self.logger.info("✓ 相似度计算完成")
             
             # 生成结果
             results = []

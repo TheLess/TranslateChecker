@@ -44,30 +44,73 @@ detection:
 
 # LLM配置
 llm:
-  # 使用的LLM提供商 (openai, local, azure)
-  provider: 'openai'
-  # OpenAI配置
+  # 使用的LLM提供商 (openai, ollama, qwen, glm, wenxin)
+  provider: 'ollama'  # 默认使用免费的Ollama
+  
+  # OpenAI配置 (付费)
   openai:
     model: 'gpt-3.5-turbo'
     api_key: ''  # 请在环境变量中设置 OPENAI_API_KEY
     max_tokens: 1000
     temperature: 0.1
-  # 本地模型配置
-  local:
-    model_path: ''
-    device: 'auto'  # auto, cpu, cuda
+    
+  # Ollama本地模型配置 (免费推荐)
+  ollama:
+    model: 'qwen2.5:14b-instruct'  # 推荐：14B指令优化版，翻译质量更高
+    # model: 'qwen2.5:7b'          # 备选：7B版本，内存需求更低
+    # model: 'qwen2.5:32b-instruct' # 备选：32B版本，最佳质量（需要更多内存）
+    base_url: 'http://localhost:11434'
+    max_tokens: 1000
+    temperature: 0.1
+    
+  # 通义千问API配置 (免费额度)
+  qwen:
+    model: 'qwen-turbo'
+    api_key: ''  # 请在环境变量中设置 DASHSCOPE_API_KEY
+    max_tokens: 1000
+    temperature: 0.1
+    
+  # 智谱AI GLM配置 (免费额度)
+  glm:
+    model: 'glm-4-flash'
+    api_key: ''  # 请在环境变量中设置 GLM_API_KEY
+    max_tokens: 1000
+    temperature: 0.1
+    
+  # 百度文心一言配置 (免费额度)
+  wenxin:
+    model: 'ernie-3.5-turbo'
+    api_key: ''  # 请在环境变量中设置 WENXIN_API_KEY
+    secret_key: ''  # 请在环境变量中设置 WENXIN_SECRET_KEY
+    max_tokens: 1000
+    temperature: 0.1
   # 评估提示词模板
   prompt_template: |
-    请评估以下中英文翻译的质量，从以下几个方面分析：
-    1. 准确性：翻译是否准确传达了原文意思
-    2. 流畅性：译文是否自然流畅
-    3. 一致性：专业术语和关键词是否一致
-    4. 完整性：是否有遗漏或添加内容
+    评估翻译质量并返回JSON格式结果。
     
     原文：{source}
     译文：{target}
     
-    请给出1-10分的评分，并简要说明问题（如果有的话）。
+    要求：
+    1. 准确性(accuracy)：翻译准确性(1-10分)
+    2. 流畅性(fluency)：语言流畅性(1-10分)  
+    3. 一致性(consistency)：术语一致性(1-10分)
+    4. 完整性(completeness)：内容完整性(1-10分)
+    
+    **重要：必须严格按照以下JSON格式返回，不要添加任何解释文字：**
+    
+    {{
+        "score": 8,
+        "accuracy": 8,
+        "fluency": 7,
+        "consistency": 9,
+        "completeness": 8,
+        "issues": ["问题描述"],
+        "suggestions": ["改进建议"],
+        "explanation": "简要说明"
+    }}
+    
+    只返回JSON，不要其他内容。
 
 # 输出配置
 output:
@@ -82,6 +125,6 @@ output:
 
 # 日志配置
 logging:
-  level: 'INFO'  # DEBUG, INFO, WARNING, ERROR
+  level: 'DEBUG'  # DEBUG, INFO, WARNING, ERROR - 启用详细调试
   file: 'logs/translation_checker.log'
   format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

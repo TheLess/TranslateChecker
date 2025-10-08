@@ -3,18 +3,16 @@ Translation Checker 主程序
 提供命令行接口进行翻译质量检查
 """
 
-import click
 import sys
+import time
+import click
 from pathlib import Path
-import json
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.progress import Progress
-from rich import print as rprint
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
 
-# 添加src目录到Python路径
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+# 简单配置，避免复杂的全局修改
 
 from src.core.checker import TranslationChecker
 from src.utils.config_loader import ConfigLoader
@@ -67,17 +65,94 @@ def check(file_path, output_path, similarity, llm, llm_filter, output_format, de
         _display_system_status(status)
         
         # 执行检查
-        with Progress() as progress:
-            task = progress.add_task("[cyan]检查中...", total=100)
+        console.print("\n[cyan]开始执行检查...[/cyan]")
+        start_time = time.time()
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            console=console
+        ) as progress:
+            # 根据启用的功能计算总权重
+            total_weight = 100
+            step_weights = {
+                'data_processing': 5,    # 数据处理很快
+                'rule_checking': 10,     # 规则检测较快
+                'similarity': 25 if similarity else 0,  # 相似度检测中等
+                'llm': 60 if llm else 0  # LLM评估最耗时
+            }
             
-            progress.update(task, advance=25, description="[cyan]数据处理中...")
-            df = checker.check_file(
-                file_path=file_path,
-                enable_similarity=similarity,
-                enable_llm=llm,
-                llm_filter=llm_filter
-            )
-            progress.update(task, advance=75, description="[green]检查完成!")
+            # 如果某些步骤被跳过，重新分配权重
+            active_weight = sum(step_weights.values())
+            if active_weight < total_weight:
+                # 将剩余权重分配给数据处理和规则检测
+                remaining = total_weight - active_weight
+                step_weights['data_processing'] += remaining // 2
+                step_weights['rule_checking'] += remaining - (remaining // 2)
+            
+            # 创建主任务
+            main_task = progress.add_task("检查中...", total=total_weight)
+            current_progress = 0
+            
+            # 步骤1: 数据处理
+            console.print("[cyan]🔄 开始步骤 1/4: 数据处理[/cyan]")
+            progress.update(main_task, description="[cyan]步骤 1/4: 数据处理")
+            df, column_mapping = checker.data_processor.process_file(file_path)
+            current_progress += step_weights['data_processing']
+            progress.update(main_task, completed=current_progress)
+            console.print(f"[green]✓ 完成步骤 1/4: 数据处理 - 处理了 {len(df)} 条数据[/green]")
+            
+            # 步骤2: 规则检测
+            console.print("[cyan]🔄 开始步骤 2/4: 基础规则检测[/cyan]")
+            progress.update(main_task, description="[cyan]步骤 2/4: 基础规则检测")
+            source_col = column_mapping['source']
+            target_col = column_mapping['target']
+            df = checker.rule_checker.check_dataframe(df, source_col, target_col)
+            current_progress += step_weights['rule_checking']
+            progress.update(main_task, completed=current_progress)
+            console.print("[green]✓ 完成步骤 2/4: 基础规则检测[/green]")
+            
+            # 步骤3: 相似度检测
+            if similarity:
+                console.print("[cyan]🔄 开始步骤 3/4: 语义相似度检测[/cyan]")
+                progress.update(main_task, description="[cyan]步骤 3/4: 语义相似度检测")
+                checker._init_similarity_model()
+                if checker.similarity_model:
+                    df = checker.similarity_model.check_dataframe(df, source_col, target_col)
+                current_progress += step_weights['similarity']
+                progress.update(main_task, completed=current_progress)
+                console.print("[green]✓ 完成步骤 3/4: 语义相似度检测[/green]")
+            else:
+                console.print("[yellow]⏭️ 跳过步骤 3/4: 语义相似度检测[/yellow]")
+                progress.update(main_task, description="[yellow]步骤 3/4: 跳过相似度检测")
+            
+            # 步骤4: LLM评估
+            if llm:
+                console.print("[cyan]🔄 开始步骤 4/4: LLM质量评估[/cyan]")
+                progress.update(main_task, description="[cyan]步骤 4/4: LLM质量评估")
+                checker._init_llm_evaluator()
+                if checker.llm_evaluator:
+                    df = checker.llm_evaluator.evaluate_dataframe(df, source_col, target_col, llm_filter)
+                current_progress += step_weights['llm']
+                progress.update(main_task, completed=current_progress)
+                console.print("[green]✓ 完成步骤 4/4: LLM质量评估[/green]")
+            else:
+                console.print("[yellow]⏭️ 跳过步骤 4/4: LLM质量评估[/yellow]")
+                progress.update(main_task, description="[yellow]步骤 4/4: 跳过LLM评估")
+            
+            progress.update(main_task, description="[green]检查完成!", completed=total_weight)
+        
+        # 记录处理统计
+        end_time = time.time()
+        processing_time = end_time - start_time
+        checker.processing_stats = {
+            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+            'processing_time': processing_time,
+            'total_items': len(df)
+        }
         
         # 显示结果摘要
         summary = checker.get_summary_report(df)
@@ -258,8 +333,13 @@ def _display_system_status(status: dict, detailed: bool = False):
     status_icons = {
         'ready': '[green]✓ 就绪[/green]',
         'loaded': '[green]✓ 已加载[/green]',
+        'lazy_load': '[blue]⏳ 延迟加载[/blue]',
         'not_loaded': '[yellow]○ 未加载[/yellow]',
         'no_api_key': '[red]✗ 缺少API密钥[/red]',
+        'missing_deps': '[red]✗ 缺少依赖[/red]',
+        'ollama_ready': '[green]✓ Ollama就绪[/green]',
+        'ollama_offline': '[red]✗ Ollama离线[/red]',
+        'api_ready': '[green]✓ API就绪[/green]',
         'unknown': '[red]? 未知[/red]'
     }
     
