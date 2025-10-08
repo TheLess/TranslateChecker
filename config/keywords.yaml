@@ -1,26 +1,24 @@
 # 关键词和术语字典
 # 用于检查翻译中关键词的一致性和规范性
 
-# 专业术语映射
+# 专业术语映射配置
 terminology:
-  # 技术术语
-  "人工智能": ["artificial intelligence", "AI"]
-  "机器学习": ["machine learning", "ML"]
-  "深度学习": ["deep learning", "DL"]
-  "神经网络": ["neural network", "NN"]
-  "自然语言处理": ["natural language processing", "NLP"]
+  # 术语来源类型: 'file' 或 'inline'
+  source_type: 'file'
+  # Excel文件路径 (相对于项目根目录)
+  excel_file: 'data/terminology.xlsx'
+  # Excel工作表名称
+  sheet_name: 'terminology'
+  # 列名配置
+  columns:
+    chinese: '中文术语'      # 中文术语列名
+    english: '英文术语'      # 英文术语列名  
+    alternatives: '备选翻译'  # 备选翻译列名(可选)
   
-  # 商业术语
-  "用户体验": ["user experience", "UX"]
-  "用户界面": ["user interface", "UI"]
-  "投资回报率": ["return on investment", "ROI"]
-  "关键绩效指标": ["key performance indicator", "KPI"]
-  
-  # 常见概念
-  "数据库": ["database", "DB"]
-  "应用程序": ["application", "app"]
-  "操作系统": ["operating system", "OS"]
-  "软件开发": ["software development"]
+  # 内联术语定义 (当source_type为'inline'时使用)
+  inline_terms:
+    "人工智能": ["artificial intelligence", "AI"]
+    "机器学习": ["machine learning", "ML"]
 
 # 品牌名称 (必须保持一致)
 brands:

@@ -44,9 +44,73 @@ class RuleChecker:
             
         try:
             with open(keywords_path, 'r', encoding='utf-8') as f:
-                return yaml.safe_load(f) or {}
+                keywords_dict = yaml.safe_load(f) or {}
+                
+            # 加载术语映射
+            terminology_config = keywords_dict.get('terminology', {})
+            if terminology_config.get('source_type') == 'file':
+                keywords_dict['terminology'] = self._load_terminology_from_excel(terminology_config)
+            else:
+                # 使用内联术语定义
+                keywords_dict['terminology'] = terminology_config.get('inline_terms', {})
+                
+            return keywords_dict
         except Exception as e:
             self.logger.error(f"加载关键词字典失败: {e}")
+            return {}
+    
+    def _load_terminology_from_excel(self, terminology_config: Dict) -> Dict:
+        """从Excel文件加载术语映射"""
+        try:
+            excel_file = terminology_config.get('excel_file', 'config/terminology.xlsx')
+            sheet_name = terminology_config.get('sheet_name', 'terminology')
+            columns = terminology_config.get('columns', {})
+            
+            # 获取列名配置
+            chinese_col = columns.get('chinese', '中文术语')
+            english_col = columns.get('english', '英文术语')
+            alternatives_col = columns.get('alternatives', '备选翻译')
+            
+            excel_path = Path(excel_file)
+            if not excel_path.exists():
+                self.logger.warning(f"术语Excel文件不存在: {excel_path}")
+                return {}
+            
+            # 读取Excel文件
+            df = pd.read_excel(excel_path, sheet_name=sheet_name)
+            
+            # 检查必需的列是否存在
+            if chinese_col not in df.columns or english_col not in df.columns:
+                self.logger.error(f"Excel文件缺少必需的列: {chinese_col} 或 {english_col}")
+                return {}
+            
+            terminology = {}
+            
+            for _, row in df.iterrows():
+                chinese_term = str(row[chinese_col]).strip()
+                english_term = str(row[english_col]).strip()
+                
+                if not chinese_term or not english_term or chinese_term == 'nan' or english_term == 'nan':
+                    continue
+                
+                # 基础英文翻译
+                english_list = [english_term]
+                
+                # 添加备选翻译
+                if alternatives_col in df.columns:
+                    alternatives = str(row[alternatives_col]).strip()
+                    if alternatives and alternatives != 'nan':
+                        # 支持多种分隔符
+                        alt_list = [alt.strip() for alt in alternatives.replace('；', ';').replace('，', ',').split(',') if alt.strip()]
+                        english_list.extend(alt_list)
+                
+                terminology[chinese_term] = english_list
+            
+            self.logger.info(f"从Excel加载了 {len(terminology)} 个术语映射")
+            return terminology
+            
+        except Exception as e:
+            self.logger.error(f"从Excel加载术语失败: {e}")
             return {}
             
     def check_length_ratio(self, source: str, target: str) -> Dict[str, Any]:
